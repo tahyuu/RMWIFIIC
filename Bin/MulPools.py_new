@@ -1,0 +1,125 @@
+#
+# Simple example which uses a pool of workers to carry out some tasks.
+#
+# Notice that the results will probably not come out of the output
+# queue in the same in the same order as the corresponding tasks were
+# put on the input queue.  If it is important to get the results back
+# in the original order then consider using `Pool.map()` or
+# `Pool.imap()` (which will save on the amount of code needed anyway).
+#
+# Copyright (c) 2006-2008, R Oudkerk
+# All rights reserved.
+import time
+import random
+import os
+import sys
+import copy
+import Queue
+
+#from TS import TS
+from Log import Log
+#from PDU import PDU
+
+#from DiagP import DiagP
+from Consumer import *
+#from UnitTest import *
+
+from multiprocessing import Process,Pool, JoinableQueue, current_process, freeze_support
+from multiprocessing import Queue as MultiprocessingQueue
+from multiprocessing import Lock
+#from TestStepDemo1 import *
+
+class MulPools():
+	def __init__(self,NUMBER_OF_PROCESSES):
+
+	    self.NUMBER_OF_PROCESSES = NUMBER_OF_PROCESSES
+	    self.TASK_COUNT = 0
+	    # Create queues
+	    self.task_queue = JoinableQueue()
+	    self.done_queue = MultiprocessingQueue()
+	    self.lock=Lock()
+
+	    # Submit tasks
+	def SubmitTasks(self, TASKS):
+	    # Enqueue jobs
+            #self.TASK_COUNT = len(TASKS)
+#	    for i in range(self.TASK_COUNT):
+#       		 self.task_queue.put()
+	    #for task in TASKS:
+	#	time.sleep(0.1)
+	#	self.task_queue.put(task)
+	    #time.sleep(0.1)
+	#    print TASKS
+	    self.Reset()
+	    self.task_queue.put(TASKS)
+	    #self.task_queue.join()
+	    #print self.task_queue
+	    #tasks.join()
+	def JoinTasks(self):
+	    self.task_queue.join()
+        
+    	# Start worker processes
+	def Start(self):
+	    #num_consumers = multiprocessing.cpu_count()
+	    #print ('Creating %d consumers' % self.NUMBER_OF_PROCESSES)
+	    self.runners = [ Consumer(self.task_queue, self.done_queue)
+                  for i in range(self.NUMBER_OF_PROCESSES) ]
+	    k=0
+	    for runner in self.runners:
+       		 runner.testIndex=k
+		 k=k+1
+		 try:
+       		 	runner.start()
+		 except:
+			pass
+	def Reset(self):
+	    for runner in self.runners:
+		 #print "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK"
+		 #print runner.shouldStop.value==1
+		 #print "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK"
+		 if runner.shouldStop.value==1:
+			runner.shouldStop.value=0
+		 #print "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK"
+		 #print runner.shouldStop.value
+		 #print "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK"
+
+	def PrintResult(self):
+	   for i in range(self.TASK_COUNT):
+	         print '\t', self.done_queue.get()
+
+	def PopResult(self):
+	    results=[]
+	    while True:
+	        try:
+	             queue_data = self.done_queue.get_nowait()
+		     results.append(queue_data)
+	    	except Queue.Empty:
+	       	     if self.done_queue.qsize() < 1:
+		        break
+	    return results
+
+        # Tell child processes to stop
+ 	def Stop(self): 
+	    # Add a poison pill for each consumer
+	#    for i in range(self.NUMBER_OF_PROCESSES):
+	        self.task_queue.put(None)
+                
+	    # Wait for all of the tasks to finish
+	    #self.task_queue.join()
+	def Term(self):
+		pass
+
+
+
+if __name__ == '__main__':
+    freeze_support()
+    lock=Lock()
+    mw =MulPools(2)
+    mw.Start()
+    mw.SubmitTasks(TASKS1)
+    print mw.PopResult()
+#    mw.SubmitTasks(TASKS2)
+#    print mw.PopResult()
+    mw.Stop()
+
+

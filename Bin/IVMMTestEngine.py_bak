@@ -1,0 +1,286 @@
+import sys
+import os
+import Queue
+from globalvar import *
+currentDir = os.getcwd()
+#import the base py file
+sys.path.append(currentDir +"/Common")
+sys.path.append(currentDir +"/Config")
+sys.path.append(currentDir +"/TestItem")
+
+from GlobalVar import *
+import time
+from Log import Log
+from Socket import Socket
+from TestStepResult import TestStepResult
+from multiprocessing import Queue as MultiprocessingQueue
+from AssingmentAddress import AssingmentAddress
+from GetFirmWareVer import GetFirmwareVer
+from PSU import PSU
+#from ZTest import ZTest
+
+#from Read3AxisAcceleration import Read3AxisAcceleration
+from ReadTemper import ReadTemper
+#from ReadADSVoltage import ReadADSVoltage
+#from CANBus import CANBus
+#from RS232 import RS232
+#from FLASH import FLASH
+from StartDDR import StartDDR 
+from ReadDDR import ReadDDR 
+from StartMMC import StartMMC 
+from ReadMMC import ReadMMC
+from MtsInt_StationConfig import *
+#from MMC import MMC
+#from QUIT import QUIT
+class BaseEngine:
+	def __init__(self,parent):
+		#self.testCount=((60*60)/30)
+		self.testCount=7
+		self.parent=parent
+	def RunTest(self):
+		pass
+	def PrepareForEachTest(self):
+		pass
+	def PopResults(self):
+		pass
+	def WriteTestResultToLog(self):
+		pass
+
+class IVMMTestEngine(BaseEngine):
+	def __init__(self,parent):
+		BaseEngine.__init__(self,parent)
+		#self.testResults=Queue
+		self.done_queue = MultiprocessingQueue()
+		self.testItems=[AssingmentAddress,GetFirmwareVer,ReadTemper,StartDDR,ReadDDR,StartMMC,ReadMMC]
+		#self.testItems=[AssingmentAddress]
+		#self.testItems=[AssingmentAddress,GetFirmwareVer,ReadTemper,StartDDR,ReadDDR,StartMMC,ReadMMC]
+	def RunTest(self):
+		i=0
+		snlist_A=["8353000142","8353000104","8353000241","8353000341","8353000395","8353000261","8353000426","8353000034","8353000436","8353000252","8353000408","8353000303","8353000112","8353000427"]
+		snlist_B=["8353000377","8353000339","8353000221","8353000296","8353000425","8353000324","8353000310","8353000249","8353000329","8353000370","8353000319","8353000398","8353000416","8353000407"]
+		snlist_C=["8353000222","8353000300","8353000316","8353000277","8353000366","8353000290","8353000295","8353000154","8353000326","8353000270","8353000497","8353000342","8353000244","8353000458"]
+		snlist_D=["8353000243","8353000428","8353000332","8353000259","8353000349","8353000344","8353000355","8353000499","8353000380","8353000320","8353000347","8353000228","a","b"]
+		snlist=snlist_A+snlist_B+snlist_C+snlist_D
+		for testUUT in self.parent.testUUTs:
+			testUUT.testCount=self.testCount
+			testUUT.sN=snlist[i]
+			self.parent.testUUTs[i]=testUUT
+			i=i+1
+		self.PrepareForEachTest()
+		#self.parent.daemonStopSignal is the singnal from worker.it indicate the work is stop or not,if the work is stoped,the testengine will stop to run.
+		global daemonStopSignal,mutex
+		#get the daemonStopSignal
+		if mutex.acquire():
+			daemonStopSignal.value=0
+			mutex.release()
+		#recode the number of test times
+		testFrequency=0
+		testStartTime=time.time()
+		#write you power on code here
+		psu=PSU()
+		psu.PowerOn()
+		time.sleep(10)
+		####################
+		#write you power on code here
+		#Assignment address
+
+		while True:
+
+			#get the daemonStopSignal
+			test_demonStopSignal=daemonStopSignal.value
+			#when the all the test stoped.or the stop button pushed. we need to end test
+			if test_demonStopSignal==1:
+				break
+			testFrequency+=1
+			allTimeOutStatus=True
+			statusArray=[]
+			i=0
+			for testUUT in self.parent.testUUTs:
+				time.sleep(1)
+				#get the daemonStopSignal
+				socket=self.parent.testsockets[testUUT.testIndex]
+				test_demonStopSignal=daemonStopSignal.value
+				#when the all the test stoped.or the stop button pushed. we need to end test
+				if test_demonStopSignal==1:
+					break
+
+				if (not testUUT.testStatus) or (time.time()-testStartTime>60*60):
+					continue
+				#init test socket	
+				#socket=Socket(socketid)
+				#excute tst item one by one
+				for ti in self.testItems:
+					#get the daemonStopSignal
+					test_demonStopSignal=daemonStopSignal.value
+					#when the all the test stoped.or the stop button pushed. we need to end test
+					if test_demonStopSignal==1:
+						break
+					socket.sn=testUUT.sN
+					obj=ti(socket)
+
+					print obj.testName
+					testResult=obj.Run()
+					testResult.testGroup="Test frequency(%s)"%(testFrequency)
+					#put result to don_queue
+					#self.done_queue.put(testResult)
+
+					#update the test status of testUUT
+					if not testResult.testStatus:
+						if testUUT.testStatus and testResult.recordResults:
+							testUUT.testStatus=False
+					testUUT.testItems.append(testResult)
+					testUUT.endTime=testResult.endTime
+					#testUUT.endTime=time.time()
+					testUUT.testTime=testUUT.endTime-testUUT.startTime
+					self.parent.testUUTs[i]=testUUT
+					#testUUT.testItems.append(testResult)
+					testUUT.log.Open("a")
+					testUUT.log.Write(testResult.log)
+					#when the test result fail we will exit this uut test
+					if not testResult.testStatus:
+						break
+				#add status to an array only if the status array all are True test will exit
+				#when the uut test failed or test time over 24H the uut test will exit the test
+				if (not testUUT.testStatus) or (time.time()-testUUT.startTime>60):
+					#currentTimeOutStatus=True
+					statusArray.append(True)
+					#allTimeOutStatus=allTimeOutStatus and currentTimeOutStatus
+					#print "uut%s is finished" %testUUT.testIndex
+					#print "uut%s status is : %s" %(testUUT.testIndex,testUUT.testStatus)
+					#continue	
+				else:
+					statusArray.append(False)
+					#print "uut%s is not finished" %testUUT.testIndex
+					#print "uut%s status is : %s" %(testUUT.testIndex,testUUT.testStatus)
+					#currentTimeOutStatus=False
+					#allTimeOutStatus=allTimeOutStatus and currentTimeOutStatus
+				#statusArray.append(testUUT.testStatus)
+				print statusArray
+				i=i+1
+			#when all the test uut test over 24H or all the test uut failed. we will exit test
+			statusFlag=True
+			for status in statusArray:
+				statusFlag=statusFlag and status
+				if not statusFlag:
+					break
+
+			if statusFlag:
+				break
+		#write you power off code here
+		psu.PowerOff()
+		##########
+		#write you power off code here
+
+	def PrepareForEachTest(self):
+		self.logpath=StationOptions["LogPath"]
+		self.StationName=StationOptions["StationName"]
+		self.TestDate = time.strftime("%Y%m%d")
+		self.savepath = self.logpath + '/' + self.StationName + '/' + self.TestDate
+		if os.path.exists(self.savepath):
+		    pass
+		else:
+		    os.makedirs(self.savepath)
+		k=0
+		self.parent.testlogfiles=[]
+		#for testUUT in self.parent.testUUTs:
+		for sn in self.parent.snList:
+			if not sn:
+				#do not add file add space to testlogfiles array
+				self.parent.testlogfiles.append("")
+			else:
+				#add file name to testlogfiles array
+				testUUT=self.parent.testUUTs[k]
+				socket=self.parent.testsockets[testUUT.testIndex]
+
+				testUUT.log_filename = testUUT.sN + '_' + time.strftime("%Y%m%d%H%M%S")+"_"+str(socket.id) + '.log'
+				testUUT.log_path = self.savepath
+				self.parent.testlogfiles.append(testUUT.log_path + '/' + testUUT.log_filename)
+				print testUUT.log_path+"/"+testUUT.log_filename
+				testUUT.log.fileName=testUUT.log_path+'/'+testUUT.log_filename
+				testUUT.log.Open("a")
+				testUUT.log.Write('                                                  ')
+				testUUT.log.Write('##################################################')
+				testUUT.log.Write('Station : '.rjust(20) + self.StationName)
+				testUUT.log.Write('Date : '.rjust(20) + self.TestDate)
+				testUUT.log.Write('SerialNumber : '.rjust(20) + testUUT.sN)
+				#testUUT.log.Write('UUTType : '.rjust(20) + testUUT.pN)
+				#testUUT.log.PrintNoTime('UUTType : '.rjust(20) + self.parent.TSLfile)
+				#self.TSLfile = str(StationOptions["TestProgram"]).replace(".py","")
+				#testUUT.log.PrintNoTime('PDUIP : '.rjust(20) + self.pduip)
+				#testUUT.log.PrintNoTime('PDUPort : '.rjust(20) + self.pduport)
+				#testUUT.log.PrintNoTime('TSIP : '.rjust(20) + self.tsip)
+				#testUUT.log.PrintNoTime('TSIP : '.rjust(20) + socket.ip)
+				#testUUT.log.PrintNoTime('TSPort : '.rjust(20) + str(socket.comPort))
+				testUUT.log.Write('485Port: '.rjust(20) + str(socket.comPort))
+				testUUT.log.Write('UUT Index : '.rjust(20) + str(testUUT.testIndex + 1))
+				testUUT.log.Write('##################################################')
+				testUUT.log.Write('Start Testing: --------------------')
+				testUUT.log.Write('##################################################')
+				self.parent.testUUTs[k]=testUUT
+				k=k+1
+	def getResult(self):
+	    results=[]
+	    while True:
+	        try:
+	             queue_data = self.done_queue.get_nowait()
+		     results.append(queue_data)
+	    	except Queue.Empty:
+	       	     if self.done_queue.qsize() < 1:
+		        break
+	    return results
+	def PopResults(self):
+		 #update the results list
+	         self.results=self.getResult()
+	         for result in self.results:
+			i=0
+			for testUUT in self.parent.testUUTs:
+				if result.testIndex==testUUT.testIndex:
+					#update the test status of testUUT
+					if not result.testStatus:
+						if testUUT.testStatus and result.recordResults:
+							testUUT.testStatus=False
+					testUUT.testItems.append(result)
+					testUUT.endTime=result.endTime
+					#testUUT.endTime=time.time()
+					testUUT.testTime=testUUT.endTime-testUUT.startTime
+					self.parent.testUUTs[i]=testUUT
+					break
+				i=i+1
+	def WriteTestResultToLog(self):
+		for testUUT in self.parent.testUUTs:
+			strResult='\n'+('Test Result:'+(testUUT.testStatus and "PASS" or "FAIL")).center(60,'-')+'\n'+('Test Time:'+str(int(testUUT.testTime))).center(60,'-')+'\n'
+			strResult+="#############################################################################################"+"\n"
+			for testItem in testUUT.testItems:
+				#check the testItem need to write into log file
+				if testItem.recordResults:
+					strResult+=testItem.testGroup.ljust(20)+" => ".rjust(10)+testItem.stepName.replace("Section","").ljust(30)+"         "+(testItem.testStatus and "PASS" or "FAIL")
+					strResult+="\n"
+			strResult+="#############################################################################################"
+			testUUT.log.Open("a")
+			testUUT.log.Write(strResult,testUUT.log_path + '/' + testUUT.log_filename)
+		pass
+
+if __name__=="__main__":
+	#testItems=[AssingmentAddress, GetFirmwareVer, Read3AxisAcceleration,ReadTemper,ReadADSVoltage,CANBus, FLASH,DDR,MMC]
+	#testItems=[AssingmentAddress,GetFirmwareVer,ReadTemper]
+	#testItems=[ZTest]*100
+	log=Log("test.log")
+	log.Open("w")
+	log.Write("")
+	log.Write("*****************************************************")
+	log.Write("Test Station : ".rjust(15)+"IVMM-Born-in")
+	log.Write("Start Time : ".rjust(15),withReturn=False)
+	log.Write("",withTime=True)
+	log.Write("End Time : ".rjust(15),withReturn=False)
+	log.Write("",withTime=True)
+	log.Write("*****************************************************")
+	log.Write("")
+	log.Write("")
+	socket=Socket(2)
+	for ti in testItems:
+		obj=ti(socket)
+		print obj.Run().log
+		log.Write(obj.Run().log)
+		log.Write("")
+	log.Write("Test End",withTime=True)
+	log.Close()
