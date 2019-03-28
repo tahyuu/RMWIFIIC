@@ -137,16 +137,70 @@ class RFWIFIIC():
         self.log.PrintNoTime('SN      : %s' %self.serial_number)
         self.log.PrintNoTime('#########################################################')
         self.log.PrintNoTime('')
-        
-    def Run(self):
+    def TxTest(self):
         ########################################
-        #to get  check AMB Temperature
+        #to to TX Test
+        #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+        #1,open serial and set the 38400.
+	#2,Pump out a window to ask operator to push the reset button.
+	#3,receive the radiotool@CC3220: and send out 2 to enter the Tx task options
+	#4,set tx interval to 10. input 7, -->10
+	#5,set txframe amount to 200. input 9 -->200.
+	#6,set txrate to 1M. 3 -->1
+	#7,set txpower to 6. 4 -->6
+        #option1 1Mbps, 6 6Mbps, 13 54Mbps
         ########################################
         self.config = Configure('Config.txt')
         #self.uut_comm = Comm232(self.config, self.log, self.uut_serial_port)
-        #self.uut_comm.setTimeout(2)
-        #self.uut_comm.SendReturn('lspci')
-        #line = self.uut_comm.RecvTerminatedBy()
+        #self.uut_comm.setTimeout(2)              
+        #self.uut_comm.SendReturn('')             # Enter
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+        #self.uut_comm.SendReturn('2')            # 2
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+        #self.uut_comm.SendReturn('7')            # 7
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+        #self.uut_comm.SendReturn('10')           # 10  ---- set tx interval 10.
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+        #self.uut_comm.SendReturn('9')            # 9
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+        #self.uut_comm.SendReturn('200')          # 200 ---- set fram amount 200.
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+        #self.uut_comm.SendReturn('3')            # 3
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+        #self.uut_comm.SendReturn('1')            # 1  ---- set rx rate to 1Mbps.  (1:1Mbps, 6:6Mbps, 13:54Mbps)
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+        #self.uut_comm.SendReturn('4')            # 4  
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+        #self.uut_comm.SendReturn('6')            # 6  ---- set tx power to  6
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+        ############################################################
+        # to push the reset(restart) button on N9010A signal analyzer
+        ############################################################
+
+        ############################################################
+        # to push the Run/Stop button and set the DC Power analyzer Time/Div to 50ms/d
+        ############################################################
+
+        #self.uut_comm.SendReturn('5')            # 5  ---- start tx task
+        #line = self.uut_comm.RecvTerminatedBy()  # |
+
+        ############################################################
+        # to push the Run/Stop button 
+        ############################################################
+
+        ############################################################
+        # to fintune the DC power analyzer offset got get Current Max
+        ############################################################
+
+        ############################################################
+        # to fintune the DC power analyzer offset got get Current Avg
+        ############################################################
+
+        ############################################################
+        # to get the Power on N9010A signal analyzer
+        ############################################################
+
+    def RxTest(self):
         #print line
         #return
         #self.gld_comm = Comm232(self.config, self.log, self.gld_serial_port)
@@ -160,6 +214,11 @@ class RFWIFIIC():
         #self.gld_comm.SendReturn('lspci')
         #line = self.gld_comm.RecvTerminatedBy()
         #print line
+        tx_rates=[1,6,13] 
+        for tx_rate in tx_rates:
+            pass
+        
+    def Run(self):
         
         if len(self.ErrorList)==0:
             self.testStatus=True
