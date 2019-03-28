@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from EventManager import *
+#from EventManager import *
 from Configure import *
 from Log import *
 import serial
@@ -14,9 +14,9 @@ import subprocess
 import re
 
 class Comm232(serial.Serial):
-    def __init__(self, config, log, eventManager, serial_port):
-	self.eventManager = eventManager
-	self.eventManager.RegisterListener( self )
+    def __init__(self, config, log,  serial_port):
+	#self.eventManager = eventManager
+	#self.eventManager.RegisterListener( self )
 	self.log = log
 	self.config = config
 	self.serial_port = serial_port
@@ -95,8 +95,8 @@ class Comm232(serial.Serial):
 	    char = self.read(1)
 	    if char is '':
 		#print 'RS232 port communication timeout'
-		self.eventManager.Post( CommTimeoutEvent() )
-		return 'FAIL'
+		#self.eventManager.Post( CommTimeoutEvent() )
+		return 'No response from UUT. please check UUT and RS232 Cable'
 	    line = line + char
 	    line2 = line2 + char
 	    #if self.verboseFlag == True:
@@ -140,7 +140,7 @@ class Comm232(serial.Serial):
 	    if line.find(self.BOOT_PROMPT) >= 0: 
         	#self.setTimeout(timeout)
 		return line
-	self.eventManager.Post( CommTimeoutEvent() )
+	#self.eventManager.Post( CommTimeoutEvent() )
 	return 'FAIL'
 
     def EnterCmdPrompt(self):
@@ -188,11 +188,11 @@ if __name__ == "__main__":
 	serial_port = '' + args[0]
 
     home_dir = os.environ['HOME']	    
-    eventManager = EventManager()
+    #eventManager = EventManager()
     config = Configure('Config.txt')
     log = Log()
     log.Open('test.log')
-    Comm = Comm232(config, log, eventManager, serial_port)
+    Comm = Comm232(config, log, serial_port)
     Comm.setPort(serial_port)
     Comm.setTimeout(int(options.timeout))
 

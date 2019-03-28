@@ -1,5 +1,9 @@
 #!/usr/bin/env python
-import os,  subprocess, time
+import os,  subprocess, time, sys
+currentDir = os.getcwd()
+#import the base py file
+sys.path.append(currentDir +"/Common")
+
 from Log import *
 import ConfigParser	
 from optparse import OptionParser
@@ -8,6 +12,10 @@ import commands
 import random
 import shutil
 from Color import *
+
+
+from Configure import *
+from Comm232 import *
 class bcolors:
     def __init__(self):
         self.HEADER = '\033[95m'
@@ -36,15 +44,16 @@ class RFWIFIIC():
         self.cf.read("config.ini")
         self.bc=bcolors()
         self.color=Color()
-        self.home_dir = os.getcwd()
+        #self.log_path = os.getcwd()
         self.testIndex=index
-        self.mac_re="[0-9A-Fa-f]{12}$"
-        self.sn_re="\w{9}$"
-        self.temp_re="^(\-|\+)?\d+(\.\d+)?$"
-        self.ip_re="((25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))\.){3}(25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))"
+        #station config
+        self.sn_re=self.cf.get("Station_Config", "sn_re")
+        self.log_path =self.cf.get("Station_Config", "log_path")
+        self.station_name =self.cf.get("Station_Config", "station_name")
+        #serial config
+        self.uut_serial_port=self.cf.get("Serial_Config", "uut_port")
+        self.gld_serial_port=self.cf.get("Serial_Config", "gld_port")
         self.PROMPT = self.cf.get("Serial_Config", "PROMPT")
-        self.uut_port=self.cf.get("Serial_Config", "uut_port")
-        self.gold_port=self.cf.get("Serial_Config", "gold_port")
         self.baudrate=self.cf.get("Serial_Config", "baudrate")
         self.bytesize=self.cf.get("Serial_Config", "bytesize")
         self.parity=self.cf.get("Serial_Config", "parity")
@@ -52,7 +61,6 @@ class RFWIFIIC():
         self.timeout=self.cf.get("Serial_Config", "timeout")
         self.xonxoff=self.cf.get("Serial_Config", "xonxoff")
         self.rtscts=self.cf.get("Serial_Config", "rtscts")
-        #self.wait_time=int(self.cf.get("CHECK", "timeout"))
         #TX Critiera
         self.test_sequences=self.cf.get("TX_CRITIERA", "test_sequences")
         self.current_max_1m=self.cf.get("TX_CRITIERA", "current_max_1m")
@@ -64,66 +72,45 @@ class RFWIFIIC():
         self.current_max_54m=self.cf.get("TX_CRITIERA", "current_max_54m")
         self.current_avg_54m=self.cf.get("TX_CRITIERA", "current_avg_54m")
         self.power_54m=self.cf.get("TX_CRITIERA", "power_54m")
+        self.serial_number=self.cf.get("DEBUG", "serial_number")
+        #debug
+        self.test_sequences=self.cf.get("TX_CRITIERA", "test_sequences")
+        self.debug_flag=self.cf.get("DEBUG", "debug")
 
-        #self.input_temp_high=float(self.cf.get("CHECK", "input_temp_high"))
-        #self.input_temp_low=float(self.cf.get("CHECK", "input_temp_low"))
-        self.bmc_ip=""
-        self.bmc_mac=""
-        self.serial_number=""
-        self.bmc_command_header="ipmitool -I lanplus -H %s -U %s -P %s %s"
-        #self.pass_qut=self.cf.get("CHECK", "pass_margin")
-        #self.bmc_ip_get_type=self.cf.get("BMC", "bmc_ip_get_type")
-        self.amb_sensores={}
-        self.fru_update_status="FAIL"
         
         self.PASS = '\n \
-***************************************************\n \
-  #########       ##        #########   #########  \n \
-  ##      ##    ##  ##     ##          ##          \n \
-  ##      ##   ##    ##    ##          ##          \n \
-  #########   ## #### ##    ########    ########   \n \
-  ##          ##      ##           ##          ##  \n \
-  ##          ##      ##           ##          ##  \n \
-  ##          ##      ##   #########   #########   \n \
-***************************************************\n'
+  ***************************************************\n \
+    #########       ##        #########   #########  \n \
+    ##      ##    ##  ##     ##          ##          \n \
+    ##      ##   ##    ##    ##          ##          \n \
+    #########   ## #### ##    ########    ########   \n \
+    ##          ##      ##           ##          ##  \n \
+    ##          ##      ##           ##          ##  \n \
+    ##          ##      ##   #########   #########   \n \
+  ***************************************************\n'
 
         self.FAIL = '\n \
-***************************************************\n \
-  ##########      ##         ######    ##          \n \
-  ##            ##  ##         ##      ##          \n \
-  ##           ##    ##        ##      ##          \n \
-  ########    ## #### ##       ##      ##          \n \
-  ##          ##      ##       ##      ##          \n \
-  ##          ##      ##       ##      ##          \n \
-  ##          ##      ##     ######    #########   \n \
-***************************************************\n'
+  ***************************************************\n \
+    ##########      ##         ######    ##          \n \
+    ##            ##  ##         ##      ##          \n \
+    ##           ##    ##        ##      ##          \n \
+    ########    ## #### ##       ##      ##          \n \
+    ##          ##      ##       ##      ##          \n \
+    ##          ##      ##       ##      ##          \n \
+    ##          ##      ##     ######    #########   \n \
+  ***************************************************\n'
         self.log=Log()
-
-    def SendReturn(self, cmdAsciiStr):
-        #self.f = subprocess.Popen(cmdAsciiStr, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        self.f = subprocess.Popen(cmdAsciiStr, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
-        tmp = "Send = %s" %cmdAsciiStr
-        #self.log.Print(tmp)
-    def RecvTerminatedBy(self,timeout=3):
-        t_beginning = time.time()
-        seconds_passed = 0
-        while True:
-            if self.f.poll() is not None:
-                break
-            seconds_passed = time.time() - t_beginning
-            if timeout and seconds_passed > timeout:
-                self.f.terminate()
-                print "Communicate timeout!!!!"
-            time.sleep(0.01)
-        return self.f.stdout.read()
 
         
     def ScanData(self):
         ########################################
         #to create test log and ask SN
         ########################################
+        if self.debug_flag=='True':
+            a = raw_input("Please Input Enter to continue: ")
+            return
         while True:
-            self.serial_number = raw_input("[Slot %s] Please Input Serial Number : " %self.testIndex)
+            self.serial_number = raw_input("Please Input Serial Number : ")
             p = re.compile(self.sn_re)
             if p.match(self.serial_number):
                 break
@@ -133,10 +120,10 @@ class RFWIFIIC():
         self.testStartTime = datetime.now().strftime("%Y/%m/%d %H:%M")
         self.log_filename = self.serial_number + \
          '-' + datetime.now().strftime("%Y%m%d%H%M%S") + '.log'
-        self.log.Open(self.home_dir + '//FTLog//TMP//' + self.log_filename)
+        self.log.Open(self.log_path + '//TMP//' + self.log_filename)
         self.log.PrintNoTime('')
         self.log.PrintNoTime('#########################################################')
-        self.log.PrintNoTime('Station : RFWIFIIC')
+        self.log.PrintNoTime('Station : %s' %self.station_name)
         self.log.PrintNoTime('Date    : ' + self.testDate)
         self.log.PrintNoTime('SN      : %s' %self.serial_number)
         self.log.PrintNoTime('#########################################################')
@@ -146,6 +133,25 @@ class RFWIFIIC():
         ########################################
         #to get  check AMB Temperature
         ########################################
+        self.config = Configure('Config.txt')
+        #self.uut_comm = Comm232(self.config, self.log, self.uut_serial_port)
+        #self.uut_comm.setTimeout(2)
+        #self.uut_comm.SendReturn('lspci')
+        #line = self.uut_comm.RecvTerminatedBy()
+        #print line
+        #return
+        self.gld_comm = Comm232(self.config, self.log, self.gld_serial_port)
+        self.gld_comm.setTimeout(2)
+        self.gld_comm.SendReturn('lspci')
+        line = self.gld_comm.RecvTerminatedBy()
+        self.gld_comm.SendReturn('lspci')
+        line = self.gld_comm.RecvTerminatedBy()
+        self.gld_comm.SendReturn('lspci')
+        line = self.gld_comm.RecvTerminatedBy()
+        self.gld_comm.SendReturn('lspci')
+        line = self.gld_comm.RecvTerminatedBy()
+        #print line
+        
         if len(self.ErrorList)==0:
             self.testStatus=True
             self.log.PrintNoTime("")
@@ -154,17 +160,17 @@ class RFWIFIIC():
             self.log.Print("ALL PASSED")
             self.log.Print("********************************************************")
             self.color.print_green_text('#########################################################')
-            self.color.print_green_text('Station : RFWIFIIC')
+            self.color.print_green_text('Station : %s' %self.station_name)
             self.color.print_green_text('Date    : ' + self.testDate)
             self.color.print_green_text('SN      : %s' %self.serial_number)
             self.color.print_green_text('#########################################################')
             self.color.print_green_text(self.PASS)
-            #movePASS='mv ' + self.home_dir + '/FTLog/TMP/' + self.log_filename + \
-            #       ' ' + self.home_dir + '/FTLog/PASS/' + self.log_filename
-            #print self.bc.BGPASS(self.home_dir + '/FTLog/PASS/' + self.log_filename)
-            self.color.print_blue_text(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
+            #movePASS='mv ' + self.log_path + '/TMP/' + self.log_filename + \
+            #       ' ' + self.log_path + '/PASS/' + self.log_filename
+            #print self.bc.BGPASS(self.log_path + '/PASS/' + self.log_filename)
+            self.color.print_blue_text(self.log_path + '/FAIL/' + self.log_filename)
             self.log.Close()
-            shutil.move(self.home_dir + '/FTLog/TMP/' + self.log_filename,self.home_dir + '/FTLog/PASS/' + self.log_filename)
+            shutil.move(self.log_path + '/TMP/' + self.log_filename,self.log_path + '/PASS/' + self.log_filename)
             #os.system(movePASS)
         else:
             self.testStatus=False
@@ -175,19 +181,19 @@ class RFWIFIIC():
             self.log.Print("********************************************************")
             #print self.bc.BGFAIL(self.FAIL)
             self.color.print_red_text('#########################################################')
-            self.color.print_red_text('Station : RFWIFIIC')
+            self.color.print_red_text('Station : %s' %self.station_name)
             self.color.print_red_text('Date    : ' + self.testDate)
             self.color.print_red_text('SN      : %s' %self.serial_number)
             self.color.print_red_text('#########################################################')
             self.color.print_red_text(self.FAIL)
-            #print self.bc.BGPASS(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
-            self.color.print_blue_text(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
-            #moveFAIL='mv ' + self.home_dir + '/FTLog/TMP/' + self.log_filename + \
-            #       ' ' + self.home_dir + '/FTLog/FAIL/' + self.log_filename
-            self.bc.BGFAIL(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
-            #print self.bc.BGFAIL(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
+            #print self.bc.BGPASS(self.log_path + '/FAIL/' + self.log_filename)
+            self.color.print_blue_text(self.log_path + '/FAIL/' + self.log_filename)
+            #moveFAIL='mv ' + self.log_path + '/TMP/' + self.log_filename + \
+            #       ' ' + self.log_path + '/FAIL/' + self.log_filename
+            self.bc.BGFAIL(self.log_path + '/FAIL/' + self.log_filename)
+            #print self.bc.BGFAIL(self.log_path + '/FAIL/' + self.log_filename)
             self.log.Close()
-            shutil.move(self.home_dir + '/FTLog/TMP/' + self.log_filename,self.home_dir + '/FTLog/FAIL/' + self.log_filename)
+            shutil.move(self.log_path + '/TMP/' + self.log_filename,self.log_path + '/FAIL/' + self.log_filename)
             #os.system(moveFAIL)
     def Wait(self,seconds):
         count=0
@@ -275,7 +281,7 @@ if __name__=="__main__":
         cre=RFWIFIIC(1)
         cre.ScanData()
         #cre.Wait(cre.wait_time)
-        cre.Wait(4)
+        #cre.Wait(4)
         cre.InitLog()
         cre.Run()
         write_str=""
