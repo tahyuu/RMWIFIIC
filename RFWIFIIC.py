@@ -12,8 +12,6 @@ import commands
 import random
 import shutil
 from Color import *
-
-
 from Configure import *
 from Comm232 import *
 class bcolors:
