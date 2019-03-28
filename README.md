@@ -108,4 +108,9 @@ mkdir NI
 mount -o loop NI-VISA-17.0.0.iso NI
 ./INSTALL
 ```
+
+* How to run create exe
+  ```
+  pyinstaller -d RFWIFIIC.spec
+  ```
   

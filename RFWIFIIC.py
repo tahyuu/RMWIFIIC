@@ -118,6 +118,17 @@ class RFWIFIIC():
         self.testStartTime = datetime.now().strftime("%Y/%m/%d %H:%M")
         self.log_filename = self.serial_number + \
          '-' + datetime.now().strftime("%Y%m%d%H%M%S") + '.log'
+        #to check if log_path is exist or not
+        isExists = os.path.exists(self.log_path+'/TMP/')
+        if not isExists: 
+            os.makedirs(self.log_path+'/TMP/')
+        isExists = os.path.exists(self.log_path+'/PASS/')
+        if not isExists: 
+            os.makedirs(self.log_path+'/PASS/')
+        isExists = os.path.exists(self.log_path+'/FAIL/')
+        if not isExists: 
+            os.makedirs(self.log_path+'/FAIl/')
+
         self.log.Open(self.log_path + '//TMP//' + self.log_filename)
         self.log.PrintNoTime('')
         self.log.PrintNoTime('#########################################################')
@@ -138,16 +149,16 @@ class RFWIFIIC():
         #line = self.uut_comm.RecvTerminatedBy()
         #print line
         #return
-        self.gld_comm = Comm232(self.config, self.log, self.gld_serial_port)
-        self.gld_comm.setTimeout(2)
-        self.gld_comm.SendReturn('lspci')
-        line = self.gld_comm.RecvTerminatedBy()
-        self.gld_comm.SendReturn('lspci')
-        line = self.gld_comm.RecvTerminatedBy()
-        self.gld_comm.SendReturn('lspci')
-        line = self.gld_comm.RecvTerminatedBy()
-        self.gld_comm.SendReturn('lspci')
-        line = self.gld_comm.RecvTerminatedBy()
+        #self.gld_comm = Comm232(self.config, self.log, self.gld_serial_port)
+        #self.gld_comm.setTimeout(2)
+        #self.gld_comm.SendReturn('lspci')
+        #line = self.gld_comm.RecvTerminatedBy()
+        #self.gld_comm.SendReturn('lspci')
+        #line = self.gld_comm.RecvTerminatedBy()
+        #self.gld_comm.SendReturn('lspci')
+        #line = self.gld_comm.RecvTerminatedBy()
+        #self.gld_comm.SendReturn('lspci')
+        #line = self.gld_comm.RecvTerminatedBy()
         #print line
         
         if len(self.ErrorList)==0:
@@ -276,16 +287,22 @@ class RFWIFIIC():
         
 if __name__=="__main__":
     while True:
-        cre=RFWIFIIC(1)
-        cre.ScanData()
-        #cre.Wait(cre.wait_time)
-        #cre.Wait(4)
-        cre.InitLog()
-        cre.Run()
-        write_str=""
-        #write_str="serial_number,amb_0_ic_raw,amb_0_ic_read_temp,amb_0_ic_real_temp,amb_0_differ,amb_1_ic_raw,amb_1_ic_read_temp,amb_1__ic_real_temp,amb_1_differ,amb_4_ic_raw,amb_4_ic_read_temp,amb_4_ic_real_temp,amb_4_differ\n"
-        write_str=write_str+cre.testStartTime+","
-        write_str=write_str+cre.serial_number+","
+        if True:
+            cre=RFWIFIIC(1)
+            cre.ScanData()
+            #cre.Wait(cre.wait_time)
+            #cre.Wait(4)
+            cre.InitLog()
+            cre.Run()
+            write_str=""
+            #write_str="serial_number,amb_0_ic_raw,amb_0_ic_read_temp,amb_0_ic_real_temp,amb_0_differ,amb_1_ic_raw,amb_1_ic_read_temp,amb_1__ic_real_temp,amb_1_differ,amb_4_ic_raw,amb_4_ic_read_temp,amb_4_ic_real_temp,amb_4_differ\n"
+            write_str=write_str+cre.testStartTime+","
+            write_str=write_str+cre.serial_number+","
+        try:
+            pass
+        except:
+            pass
+            #print "Error"
         #for amb_index in [0,1,4]:
         #    write_str=write_str+str(cre.amb_sensores["amb%s_read_raw_data" %amb_index])+","
         #    write_str=write_str+str(cre.amb_sensores["amb%s_read_temp" %amb_index])+","
