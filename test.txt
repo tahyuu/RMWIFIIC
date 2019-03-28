@@ -1,0 +1,4 @@
+LSI SI,SI-01,PN 12345678,SN 123456,WWID 11223344,PASS,00
+****************
+10:55:45.92 hello world
+10:55:45.92 good morning

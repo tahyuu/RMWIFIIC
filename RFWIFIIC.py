@@ -6,6 +6,8 @@ from optparse import OptionParser
 import pexpect
 import commands
 import random
+import shutil
+from Color import *
 class bcolors:
     def __init__(self):
         self.HEADER = '\033[95m'
@@ -29,31 +31,48 @@ class bcolors:
 
 class RFWIFIIC():
     def __init__(self,index):
+        self.ErrorList=[]
         self.cf = ConfigParser.ConfigParser()
         self.cf.read("config.ini")
-        self.PROMPT = ">"
         self.bc=bcolors()
+        self.color=Color()
         self.home_dir = os.getcwd()
         self.testIndex=index
         self.mac_re="[0-9A-Fa-f]{12}$"
         self.sn_re="\w{9}$"
         self.temp_re="^(\-|\+)?\d+(\.\d+)?$"
         self.ip_re="((25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))\.){3}(25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))"
-        self.dhcp_server=self.cf.get("DHCP", "dhcp_server")
-        self.dhcp_leases_root=self.cf.get("DHCP", "dhcp_leases_root")
-        self.dhcp_username=self.cf.get("DHCP", "dhcp_user_name")
-        self.dhcp_password=self.cf.get("DHCP", "dhcp_password")
-        self.bmc_username=self.cf.get("BMC", "bmc_user_name")
-        self.bmc_password=self.cf.get("BMC", "bmc_password")
-        self.wait_time=int(self.cf.get("CHECK", "wait_time"))
-        self.input_temp_high=float(self.cf.get("CHECK", "input_temp_high"))
-        self.input_temp_low=float(self.cf.get("CHECK", "input_temp_low"))
+        self.PROMPT = self.cf.get("Serial_Config", "PROMPT")
+        self.uut_port=self.cf.get("Serial_Config", "uut_port")
+        self.gold_port=self.cf.get("Serial_Config", "gold_port")
+        self.baudrate=self.cf.get("Serial_Config", "baudrate")
+        self.bytesize=self.cf.get("Serial_Config", "bytesize")
+        self.parity=self.cf.get("Serial_Config", "parity")
+        self.stopbits=self.cf.get("Serial_Config", "stopbits")
+        self.timeout=self.cf.get("Serial_Config", "timeout")
+        self.xonxoff=self.cf.get("Serial_Config", "xonxoff")
+        self.rtscts=self.cf.get("Serial_Config", "rtscts")
+        #self.wait_time=int(self.cf.get("CHECK", "timeout"))
+        #TX Critiera
+        self.test_sequences=self.cf.get("TX_CRITIERA", "test_sequences")
+        self.current_max_1m=self.cf.get("TX_CRITIERA", "current_max_1m")
+        self.current_avg_1m=self.cf.get("TX_CRITIERA", "current_avg_1m")
+        self.power_1m=self.cf.get("TX_CRITIERA", "power_1m")
+        self.current_max_6m=self.cf.get("TX_CRITIERA", "current_max_6m")
+        self.current_avg_6m=self.cf.get("TX_CRITIERA", "current_avg_6m")
+        self.power_6m=self.cf.get("TX_CRITIERA", "power_6m")
+        self.current_max_54m=self.cf.get("TX_CRITIERA", "current_max_54m")
+        self.current_avg_54m=self.cf.get("TX_CRITIERA", "current_avg_54m")
+        self.power_54m=self.cf.get("TX_CRITIERA", "power_54m")
+
+        #self.input_temp_high=float(self.cf.get("CHECK", "input_temp_high"))
+        #self.input_temp_low=float(self.cf.get("CHECK", "input_temp_low"))
         self.bmc_ip=""
         self.bmc_mac=""
         self.serial_number=""
         self.bmc_command_header="ipmitool -I lanplus -H %s -U %s -P %s %s"
-        self.pass_qut=self.cf.get("CHECK", "pass_margin")
-        self.bmc_ip_get_type=self.cf.get("BMC", "bmc_ip_get_type")
+        #self.pass_qut=self.cf.get("CHECK", "pass_margin")
+        #self.bmc_ip_get_type=self.cf.get("BMC", "bmc_ip_get_type")
         self.amb_sensores={}
         self.fru_update_status="FAIL"
         
@@ -98,61 +117,17 @@ class RFWIFIIC():
             time.sleep(0.01)
         return self.f.stdout.read()
 
-    def PingHost(self,host):
-        #step 1 ping dhcp server
-        self.ping_wait=30
-        while True:
-            backinfo = commands.getstatusoutput('ping -c 2 -w %s %s'%(self.ping_wait,host))
-            print backinfo[1]
-            if backinfo[1].find(", 0% packet loss")<0:
-                print self.bc.BGFAIL("make sure you can ping %s.\n" %(host))
-                #sys.exit(0)
-            else:
-                break
-    def GetDHCPIPAddress(self):
-        #step 1 copy dhcp.release
-        command ="scp -rq -o StrictHostKeyChecking=no %s@%s:%s dhcpd.leases" %(self.dhcp_username,self.dhcp_server,self.dhcp_leases_root)
-        child = pexpect.spawn(command)
-        index = child.expect(["(?i)password", pexpect.EOF, pexpect.TIMEOUT])
-        child.sendline("%s" %self.dhcp_password)
-        child.read()
-       
-        #step 2 get ipaddress from dhcp release
-        command="./list_dhcp_leases --lease dhcpd.leases | grep -i '%s'" %self.bmc_mac
-	print command
-        self.SendReturn(command)
-        str_ipaddr =self.RecvTerminatedBy()
-        p = re.compile(self.ip_re)
-        m = p.search(str_ipaddr)
-        if m:
-            self.bmc_ip=m.group()
-            return True
-        else:
-            print self.bc.BGFAIL("can't find mac [%s] in dhcp.release will try later." %(self.bmc_mac))
-            return False
         
     def ScanData(self):
         ########################################
-        #to create test log and ask SN and MAC
+        #to create test log and ask SN
         ########################################
         while True:
             self.serial_number = raw_input("[Slot %s] Please Input Serial Number : " %self.testIndex)
             p = re.compile(self.sn_re)
             if p.match(self.serial_number):
                 break
-        if self.bmc_ip_get_type=="0":
-            while True:
-                self.bmc_mac = raw_input("[Slot %s]  Please Input MAC Address : " %self.testIndex).replace(":","")
-                p = re.compile(self.mac_re)
-                if p.match(self.bmc_mac):
-                    self.bmc_mac=":".join(re.findall("[0-9a-fA-F]{2}",self.bmc_mac))
-                    break
-        else:
-            while True:
-                self.bmc_ip= raw_input("Please Input MAC IP Address : ")
-                p = re.compile(self.ip_re)
-                if p.match(self.bmc_ip):
-                    break
+
     def InitLog(self):
         self.testDate = datetime.now().strftime("%Y/%m/%d")
         self.testStartTime = datetime.now().strftime("%Y/%m/%d %H:%M")
@@ -164,31 +139,13 @@ class RFWIFIIC():
         self.log.PrintNoTime('Station : RFWIFIIC')
         self.log.PrintNoTime('Date    : ' + self.testDate)
         self.log.PrintNoTime('SN      : %s' %self.serial_number)
-        self.log.PrintNoTime('BMC MAC : %s' %self.bmc_mac)
         self.log.PrintNoTime('#########################################################')
         self.log.PrintNoTime('')
-    def GetIpaddres(self):
-        ########################################
-        #to get dchp ipaddress for current mac
-        ########################################
-        if self.bmc_ip_get_type=="0":
-            self.PingHost(self.dhcp_server)
-            while True:
-                if self.GetDHCPIPAddress():
-                    break
-                else:
-                    time.sleep(5)
-        else:
-            self.PingHost(self.bmc_ip)
-        self.ErrorList=[]
+        
     def Run(self):
         ########################################
         #to get  check AMB Temperature
         ########################################
-        self.UpdateFru()
-        self.AMBTest(0,True) 
-        self.AMBTest(1,True) 
-        self.AMBTest(4,True)
         if len(self.ErrorList)==0:
             self.testStatus=True
             self.log.PrintNoTime("")
@@ -196,11 +153,19 @@ class RFWIFIIC():
             self.log.Print("********************************************************")
             self.log.Print("ALL PASSED")
             self.log.Print("********************************************************")
-            print self.bc.BGPASS(self.PASS)
-            movePASS='mv ' + self.home_dir + '/FTLog/TMP/' + self.log_filename + \
-                   ' ' + self.home_dir + '/FTLog/PASS/' + self.log_filename
-            print self.bc.BGPASS(self.home_dir + '/FTLog/PASS/' + self.log_filename)
-            os.system(movePASS)
+            self.color.print_green_text('#########################################################')
+            self.color.print_green_text('Station : RFWIFIIC')
+            self.color.print_green_text('Date    : ' + self.testDate)
+            self.color.print_green_text('SN      : %s' %self.serial_number)
+            self.color.print_green_text('#########################################################')
+            self.color.print_green_text(self.PASS)
+            #movePASS='mv ' + self.home_dir + '/FTLog/TMP/' + self.log_filename + \
+            #       ' ' + self.home_dir + '/FTLog/PASS/' + self.log_filename
+            #print self.bc.BGPASS(self.home_dir + '/FTLog/PASS/' + self.log_filename)
+            self.color.print_blue_text(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
+            self.log.Close()
+            shutil.move(self.home_dir + '/FTLog/TMP/' + self.log_filename,self.home_dir + '/FTLog/PASS/' + self.log_filename)
+            #os.system(movePASS)
         else:
             self.testStatus=False
             self.log.PrintNoTime("")
@@ -208,19 +173,22 @@ class RFWIFIIC():
             self.log.Print("********************************************************")
             self.log.Print("Test FAILED. %s HAS/HAVE ERROR" %(",".join(self.ErrorList)))
             self.log.Print("********************************************************")
-            print self.bc.BGFAIL(self.FAIL)
-            moveFAIL='mv ' + self.home_dir + '/FTLog/TMP/' + self.log_filename + \
-                   ' ' + self.home_dir + '/FTLog/FAIL/' + self.log_filename
+            #print self.bc.BGFAIL(self.FAIL)
+            self.color.print_red_text('#########################################################')
+            self.color.print_red_text('Station : RFWIFIIC')
+            self.color.print_red_text('Date    : ' + self.testDate)
+            self.color.print_red_text('SN      : %s' %self.serial_number)
+            self.color.print_red_text('#########################################################')
+            self.color.print_red_text(self.FAIL)
+            #print self.bc.BGPASS(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
+            self.color.print_blue_text(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
+            #moveFAIL='mv ' + self.home_dir + '/FTLog/TMP/' + self.log_filename + \
+            #       ' ' + self.home_dir + '/FTLog/FAIL/' + self.log_filename
             self.bc.BGFAIL(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
-            print self.bc.BGFAIL(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
-            os.system(moveFAIL)
-    def Run2(self):
-        #self.UpdateFru()
-        self.AMBTest(0,False) 
-        time.sleep(random.uniform(0,0.1))
-        self.AMBTest(1,False) 
-        time.sleep(random.uniform(0,0.1))
-        self.AMBTest(4,False)
+            #print self.bc.BGFAIL(self.home_dir + '/FTLog/FAIL/' + self.log_filename)
+            self.log.Close()
+            shutil.move(self.home_dir + '/FTLog/TMP/' + self.log_filename,self.home_dir + '/FTLog/FAIL/' + self.log_filename)
+            #os.system(moveFAIL)
     def Wait(self,seconds):
         count=0
         while (count < seconds):
@@ -236,27 +204,6 @@ class RFWIFIIC():
             else:
                 pass
             
-    def UpdateFru(self):
-        #update fru
-        fru_update_cmd="fru edit 0 field b 3 MP-00033236-010"
-        update_command=self.bmc_command_header %(self.bmc_ip,self.bmc_username,self.bmc_password,fru_update_cmd)
-        for i in range(5):
-            time.sleep(5)
-            self.SendReturn(update_command)
-            line=self.RecvTerminatedBy()
-            self.log.Print(line)
-            #check fru
-            fru_update_cmd="fru"
-            check_command=self.bmc_command_header %(self.bmc_ip,self.bmc_username,self.bmc_password,fru_update_cmd)
-            self.SendReturn(check_command)
-            line=self.RecvTerminatedBy()
-            self.log.Print(line)
-            if line.find("Board Part Number     : MP-00033236-010")>=0:
-                self.log.Print("update FRU sucess")
-                self.fru_update_status="PASS"
-                break
-            else:
-                self.log.Print("update FRU failed")
 
     def AMBTest(self,amb_index,askInput):
         #commmand for get AMB0 
@@ -327,21 +274,21 @@ if __name__=="__main__":
     while True:
         cre=RFWIFIIC(1)
         cre.ScanData()
-        cre.Wait(cre.wait_time)
+        #cre.Wait(cre.wait_time)
+        cre.Wait(4)
         cre.InitLog()
-        cre.GetIpaddres()
         cre.Run()
         write_str=""
         #write_str="serial_number,amb_0_ic_raw,amb_0_ic_read_temp,amb_0_ic_real_temp,amb_0_differ,amb_1_ic_raw,amb_1_ic_read_temp,amb_1__ic_real_temp,amb_1_differ,amb_4_ic_raw,amb_4_ic_read_temp,amb_4_ic_real_temp,amb_4_differ\n"
         write_str=write_str+cre.testStartTime+","
         write_str=write_str+cre.serial_number+","
-        for amb_index in [0,1,4]:
-            write_str=write_str+str(cre.amb_sensores["amb%s_read_raw_data" %amb_index])+","
-            write_str=write_str+str(cre.amb_sensores["amb%s_read_temp" %amb_index])+","
-            write_str=write_str+str(cre.amb_sensores["amb%s_real_temp" %amb_index])+","
-            write_str=write_str+str(float(cre.amb_sensores["amb%s_real_temp" %amb_index])-float(cre.amb_sensores["amb%s_read_temp" %amb_index]))+","
-        write_str=write_str+(cre.testStatus and "pass" or "fail")
-        log=Log()
-        log.Open3('data.csv')
-        log.PrintNoTime(write_str.strip(","))
+        #for amb_index in [0,1,4]:
+        #    write_str=write_str+str(cre.amb_sensores["amb%s_read_raw_data" %amb_index])+","
+        #    write_str=write_str+str(cre.amb_sensores["amb%s_read_temp" %amb_index])+","
+        #    write_str=write_str+str(cre.amb_sensores["amb%s_real_temp" %amb_index])+","
+        #    write_str=write_str+str(float(cre.amb_sensores["amb%s_real_temp" %amb_index])-float(cre.amb_sensores["amb%s_read_temp" %amb_index]))+","
+        #write_str=write_str+(cre.testStatus and "pass" or "fail")
+        #log=Log()
+        #log.Open3('data.csv')
+        #log.PrintNoTime(write_str.strip(","))
             
