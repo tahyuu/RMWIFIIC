@@ -14,6 +14,14 @@ import shutil
 from Color import *
 from Configure import *
 from Comm232 import *
+import re
+class TestItemResult:
+    def __init__(self):
+        self.testName=""
+        self.lowValue=""
+        self.HighValue=""
+        self.testValue=""
+
 class bcolors:
     def __init__(self):
         self.HEADER = '\033[95m'
@@ -38,6 +46,7 @@ class bcolors:
 class RFWIFIIC():
     def __init__(self,index):
         self.ErrorList=[]
+        self.testItemResultList=[]
         self.cf = ConfigParser.ConfigParser()
         self.cf.read("config.ini")
         self.bc=bcolors()
@@ -48,6 +57,7 @@ class RFWIFIIC():
         self.sn_re=self.cf.get("Station_Config", "sn_re")
         self.log_path =self.cf.get("Station_Config", "log_path")
         self.station_name =self.cf.get("Station_Config", "station_name")
+        self.fail_break=self.cf.get("Station_Config", "fail_break")
         #serial config
         self.uut_serial_port=self.cf.get("Serial_Config", "uut_port")
         self.gld_serial_port=self.cf.get("Serial_Config", "gld_port")
@@ -61,15 +71,24 @@ class RFWIFIIC():
         self.rtscts=self.cf.get("Serial_Config", "rtscts")
         #TX Critiera
         self.test_sequences=self.cf.get("TX_CRITIERA", "test_sequences")
-        self.current_max_1m=self.cf.get("TX_CRITIERA", "current_max_1m")
-        self.current_avg_1m=self.cf.get("TX_CRITIERA", "current_avg_1m")
-        self.power_1m=self.cf.get("TX_CRITIERA", "power_1m")
-        self.current_max_6m=self.cf.get("TX_CRITIERA", "current_max_6m")
-        self.current_avg_6m=self.cf.get("TX_CRITIERA", "current_avg_6m")
-        self.power_6m=self.cf.get("TX_CRITIERA", "power_6m")
-        self.current_max_54m=self.cf.get("TX_CRITIERA", "current_max_54m")
-        self.current_avg_54m=self.cf.get("TX_CRITIERA", "current_avg_54m")
-        self.power_54m=self.cf.get("TX_CRITIERA", "power_54m")
+        self.current_max_1m_low=self.cf.get("TX_CRITIERA", "current_max_1m_low")
+        self.current_max_1m_high=self.cf.get("TX_CRITIERA", "current_max_1m_high")
+        self.current_avg_1m_low=self.cf.get("TX_CRITIERA", "current_avg_1m_low")
+        self.current_avg_1m_high=self.cf.get("TX_CRITIERA", "current_avg_1m_high")
+        self.power_1m_low=self.cf.get("TX_CRITIERA", "power_1m_low")
+        self.power_1m_high=self.cf.get("TX_CRITIERA", "power_1m_high")
+        self.current_max_6m_low=self.cf.get("TX_CRITIERA", "current_max_6m_low")
+        self.current_max_6m_high=self.cf.get("TX_CRITIERA", "current_max_6m_high")
+        self.current_avg_6m_low=self.cf.get("TX_CRITIERA", "current_avg_6m_low")
+        self.current_avg_6m_high=self.cf.get("TX_CRITIERA", "current_avg_6m_high")
+        self.power_6m_low=self.cf.get("TX_CRITIERA", "power_6m_low")
+        self.power_6m_high=self.cf.get("TX_CRITIERA", "power_6m_high")
+        self.current_max_54m_low=self.cf.get("TX_CRITIERA", "current_max_54m_low")
+        self.current_max_54m_high=self.cf.get("TX_CRITIERA", "current_max_54m_high")
+        self.current_avg_54m_low=self.cf.get("TX_CRITIERA", "current_avg_54m_low")
+        self.current_avg_54m_high=self.cf.get("TX_CRITIERA", "current_avg_54m_high")
+        self.power_54m_low=self.cf.get("TX_CRITIERA", "power_54m_low")
+        self.power_54m_high=self.cf.get("TX_CRITIERA", "power_54m_high")
         self.serial_number=self.cf.get("DEBUG", "serial_number")
         #debug
         self.test_sequences=self.cf.get("TX_CRITIERA", "test_sequences")
@@ -150,55 +169,130 @@ class RFWIFIIC():
 	#7,set txpower to 6. 4 -->6
         #option1 1Mbps, 6 6Mbps, 13 54Mbps
         ########################################
+        rate_list=['1','6','54']
+        rate_index=0
         self.config = Configure('Config.txt')
-        #self.uut_comm = Comm232(self.config, self.log, self.uut_serial_port)
-        #self.uut_comm.setTimeout(2)              
-        #self.uut_comm.SendReturn('')             # Enter
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-        #self.uut_comm.SendReturn('2')            # 2
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-        #self.uut_comm.SendReturn('7')            # 7
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-        #self.uut_comm.SendReturn('10')           # 10  ---- set tx interval 10.
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-        #self.uut_comm.SendReturn('9')            # 9
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-        #self.uut_comm.SendReturn('200')          # 200 ---- set fram amount 200.
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-        #self.uut_comm.SendReturn('3')            # 3
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-        #self.uut_comm.SendReturn('1')            # 1  ---- set rx rate to 1Mbps.  (1:1Mbps, 6:6Mbps, 13:54Mbps)
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-        #self.uut_comm.SendReturn('4')            # 4  
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-        #self.uut_comm.SendReturn('6')            # 6  ---- set tx power to  6
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-        ############################################################
-        # to push the reset(restart) button on N9010A signal analyzer
-        ############################################################
+        for rate in ['1','6','13']: #(1:1Mbps, 6:6Mbps, 13:54Mbps)
+            #self.uut_comm = Comm232(self.config, self.log, self.uut_serial_port)
+            #self.uut_comm.setTimeout(2)              
+            #self.uut_comm.SendReturn('')             # Enter
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+            #self.uut_comm.SendReturn('2')            # 2
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+            #self.uut_comm.SendReturn('7')            # 7
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+            #self.uut_comm.SendReturn('10')           # 10  ---- set tx interval 10.
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+            #self.uut_comm.SendReturn('9')            # 9
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+            #self.uut_comm.SendReturn('200')          # 200 ---- set fram amount 200.
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+            #self.uut_comm.SendReturn('3')            # 3
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+            #self.uut_comm.SendReturn('%s' %rate)     # 1  ---- set rx rate to 1Mbps.  (1:1Mbps, 6:6Mbps, 13:54Mbps)
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+            #self.uut_comm.SendReturn('4')            # 4  
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+            #self.uut_comm.SendReturn('6')            # 6  ---- set tx power to  6
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+            ############################################################
+            # to push the reset(restart) button on N9010A signal analyzer
+            ############################################################
+    
+            ############################################################
+            # to push the Run/Stop button and set the DC Power analyzer Time/Div to 50ms/d
+            ############################################################
+    
+            #self.uut_comm.SendReturn('5')            # 5  ---- start tx task
+            #line = self.uut_comm.RecvTerminatedBy()  # |
+    
+            ############################################################
+            # to push the Run/Stop button 
+            ############################################################
+    
+            ############################################################
+            # to fintune the DC power analyzer offset got get Current Max
+            ############################################################
+            while True:
+                currentMax= raw_input("\nPlease input the DC Power Max Current for rate(%sMbps) : " %rate_list[rate_index])
+                p = re.compile('^(\-|\+)?\d+(\.\d+)?$')
+                if p.match(currentMax):
+                    currentMax=float(currentMax)
+                    break
+                else:
+                    print "the input Current Max [%s] is not in correct format. please try again"
+            lowValue=float(eval('self.current_max_%sm_low' %rate_list[rate_index]))
+            highValue=float(eval('self.current_max_%sm_high' %rate_list[rate_index]))
+            testName="current_max_%sm_test" %rate_list[rate_index]
+            tir=TestItemResult()
+            tir.testName=testName
+            tir.lowValue=lowValue
+            tir.highValue=highValue
+            tir.testValue=currentMax
+            self.testItemResultList.append(tir)
+            if lowValue<=currentMax<=highValue:
+                pass
+            else:
+                self.ErrorList.append("current_max_%sm_test" %rate_list[rate_index])
+                if self.fail_break=="True":
+                    return
 
-        ############################################################
-        # to push the Run/Stop button and set the DC Power analyzer Time/Div to 50ms/d
-        ############################################################
+    
+            ############################################################
+            # to fintune the DC power analyzer offset got get Current Avg
+            ############################################################
+            while True:
+                currentAvg= raw_input("\nPlease input the DC Power Avg Current for rate(%sMbps) : " %rate_list[rate_index])
+                p = re.compile('^(\-|\+)?\d+(\.\d+)?$')
+                if p.match(currentAvg):
+                    currentAvg=float(currentAvg)
+                    break
+                else:
+                    print "the input Current Avg [%s] is not in correct format. please try again" %rate_list[rate_index]
+            lowValue=float(eval('self.current_avg_%sm_low' %rate_list[rate_index]))
+            highValue=float(eval('self.current_avg_%sm_high' %rate_list[rate_index]))
+            testName="current_avg_%sm_test" %rate_list[rate_index]
+            tir=TestItemResult()
+            tir.testName=testName
+            tir.lowValue=lowValue
+            tir.highValue=highValue
+            tir.testValue=currentAvg
+            self.testItemResultList.append(tir)
+            if lowValue<=currentAvg<=highValue:
+                pass
+            else:
+                self.ErrorList.append("current_avg_%sm_test" %rate_list[rate_index])
+                if self.fail_break=="True":
+                    return
+    
+            ############################################################
+            # to get the Power on N9010A signal analyzer
+            ############################################################
+            while True:
+                signalPower= raw_input("\nPlease input the Signal Power for rate(%sMbps) : " %rate_list[rate_index])
+                p = re.compile('^(\-|\+)?\d+(\.\d+)?$')
+                if p.match(signalPower):
+                    signalPower=float(signalPower)
+                    break
+                else:
+                    print "the input signal Power [%s] is not in correct format. please try again"
+            lowValue=float(eval('self.power_%sm_low' %rate_list[rate_index]))
+            highValue=float(eval('self.power_%sm_high' %rate_list[rate_index]))
+            testName="power_%sm_test" %rate_list[rate_index]
+            tir=TestItemResult()
+            tir.testName=testName
+            tir.lowValue=lowValue
+            tir.highValue=highValue
+            tir.testValue=signalPower
+            self.testItemResultList.append(tir)
+            if lowValue<=signalPower<=highValue:
+                pass
+            else:
+                self.ErrorList.append("power_%sm_test" %rate_list[rate_index])
+                if self.fail_break=="True":
+                    return
 
-        #self.uut_comm.SendReturn('5')            # 5  ---- start tx task
-        #line = self.uut_comm.RecvTerminatedBy()  # |
-
-        ############################################################
-        # to push the Run/Stop button 
-        ############################################################
-
-        ############################################################
-        # to fintune the DC power analyzer offset got get Current Max
-        ############################################################
-
-        ############################################################
-        # to fintune the DC power analyzer offset got get Current Avg
-        ############################################################
-
-        ############################################################
-        # to get the Power on N9010A signal analyzer
-        ############################################################
+            rate_index=rate_index+1
 
     def RxTest(self):
         #print line
@@ -219,6 +313,9 @@ class RFWIFIIC():
             pass
         
     def Run(self):
+        self.ErrorList=[]
+        self.testItemResultList=[]
+        self.TxTest()
         
         if len(self.ErrorList)==0:
             self.testStatus=True
@@ -232,6 +329,9 @@ class RFWIFIIC():
             self.color.print_green_text('Date    : ' + self.testDate)
             self.color.print_green_text('SN      : %s' %self.serial_number)
             self.color.print_green_text('#########################################################')
+            print "Test Name".ljust(25)+ "Except Value".ljust(20)+"Test Value".ljust(10)
+            for item in self.testItemResultList:
+                print item.testName.ljust(25)+("%s <= X <= %s" %(str(item.lowValue).rjust(5),item.highValue)).ljust(20)+str(item.testValue).rjust(10)
             self.color.print_green_text(self.PASS)
             #movePASS='mv ' + self.log_path + '/TMP/' + self.log_filename + \
             #       ' ' + self.log_path + '/PASS/' + self.log_filename
@@ -253,6 +353,9 @@ class RFWIFIIC():
             self.color.print_red_text('Date    : ' + self.testDate)
             self.color.print_red_text('SN      : %s' %self.serial_number)
             self.color.print_red_text('#########################################################')
+            print "Test Name".ljust(25)+ "Except Value".ljust(20)+"Test Value".ljust(10)
+            for item in self.testItemResultList:
+                print item.testName.ljust(25)+("%s <= X <= %s" %(str(item.lowValue).rjust(5),item.highValue)).ljust(20)+str(item.testValue).rjust(10)
             self.color.print_red_text(self.FAIL)
             #print self.bc.BGPASS(self.log_path + '/FAIL/' + self.log_filename)
             self.color.print_blue_text(self.log_path + '/FAIL/' + self.log_filename)
