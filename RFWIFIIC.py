@@ -330,8 +330,10 @@ class RFWIFIIC():
             self.color.print_green_text('SN      : %s' %self.serial_number)
             self.color.print_green_text('#########################################################')
             print "Test Name".ljust(25)+ "Except Value".ljust(20)+"Test Value".ljust(10)
+            self.log.Print("Test Name".ljust(25)+ "Except Value".ljust(20)+"Test Value".ljust(10))
             for item in self.testItemResultList:
                 print item.testName.ljust(25)+("%s <= X <= %s" %(str(item.lowValue).rjust(5),item.highValue)).ljust(20)+str(item.testValue).rjust(10)
+                self.log.Print(item.testName.ljust(25)+("%s <= X <= %s" %(str(item.lowValue).rjust(5),item.highValue)).ljust(20)+str(item.testValue).rjust(10))
             self.color.print_green_text(self.PASS)
             #movePASS='mv ' + self.log_path + '/TMP/' + self.log_filename + \
             #       ' ' + self.log_path + '/PASS/' + self.log_filename
@@ -354,14 +356,16 @@ class RFWIFIIC():
             self.color.print_red_text('SN      : %s' %self.serial_number)
             self.color.print_red_text('#########################################################')
             print "Test Name".ljust(25)+ "Except Value".ljust(20)+"Test Value".ljust(10)
+            self.log.Print("Test Name".ljust(25)+ "Except Value".ljust(20)+"Test Value".ljust(10))
             for item in self.testItemResultList:
                 print item.testName.ljust(25)+("%s <= X <= %s" %(str(item.lowValue).rjust(5),item.highValue)).ljust(20)+str(item.testValue).rjust(10)
+                self.log.Print(item.testName.ljust(25)+("%s <= X <= %s" %(str(item.lowValue).rjust(5),item.highValue)).ljust(20)+str(item.testValue).rjust(10))
             self.color.print_red_text(self.FAIL)
             #print self.bc.BGPASS(self.log_path + '/FAIL/' + self.log_filename)
             self.color.print_blue_text(self.log_path + '/FAIL/' + self.log_filename)
             #moveFAIL='mv ' + self.log_path + '/TMP/' + self.log_filename + \
             #       ' ' + self.log_path + '/FAIL/' + self.log_filename
-            self.bc.BGFAIL(self.log_path + '/FAIL/' + self.log_filename)
+            #self.bc.BGFAIL(self.log_path + '/FAIL/' + self.log_filename)
             #print self.bc.BGFAIL(self.log_path + '/FAIL/' + self.log_filename)
             self.log.Close()
             shutil.move(self.log_path + '/TMP/' + self.log_filename,self.log_path + '/FAIL/' + self.log_filename)
