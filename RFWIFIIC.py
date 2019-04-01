@@ -48,10 +48,12 @@ class bcolors:
 class RFWIFIIC():
     modelName=''
     def __init__(self,index):
+        self.GetModelList()
         self.ErrorList=[]
         self.testItemResultList=[]
         self.cf = ConfigParser.ConfigParser()
-        self.cf.read("config.ini")
+        print RFWIFIIC.modelName
+        self.cf.read('Model\\'+RFWIFIIC.modelName)
         self.bc=bcolors()
         self.color=Color()
         #self.log_path = os.getcwd()
@@ -123,9 +125,9 @@ class RFWIFIIC():
 
 
 
-        self.GetModelList()
 
     def GetModelList(self):
+        modelList=[]
         if RFWIFIIC.modelName!='':
             return
         p_ini_file=re.compile('^\S+ini$')
@@ -136,6 +138,7 @@ class RFWIFIIC():
         i=1
         for model in models:
             if p_ini_file.match(model):
+                modelList.append(model)
                 print " %s  :  %s" %(i,model)
                 i=i+1
         print
@@ -143,7 +146,7 @@ class RFWIFIIC():
             self.modelIndex= raw_input("Please select the Model : ")
             if p.match(self.modelIndex) and 0<int(self.modelIndex)<i:
                 break
-        RFWIFIIC.modelName=models[int(self.modelIndex)]
+        RFWIFIIC.modelName=modelList[int(self.modelIndex)-1]
         print 'You select Model is : %s' %RFWIFIIC.modelName
         
     def ScanData(self):
