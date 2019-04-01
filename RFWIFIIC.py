@@ -15,6 +15,8 @@ from Color import *
 from Configure import *
 from Comm232 import *
 import re
+modelName=""
+
 class TestItemResult:
     def __init__(self):
         self.testName=""
@@ -44,6 +46,7 @@ class bcolors:
         return "%s%s%s" %(self.FAIL,s,self.ENDC)
 
 class RFWIFIIC():
+    modelName=''
     def __init__(self,index):
         self.ErrorList=[]
         self.testItemResultList=[]
@@ -118,16 +121,38 @@ class RFWIFIIC():
   ***************************************************\n'
         self.log=Log()
 
+
+
+        self.GetModelList()
+
+    def GetModelList(self):
+        if RFWIFIIC.modelName!='':
+            return
+        p=re.compile('^\d+$')
+        models = os.listdir('Model')
+        print "Model List as below:" 
+        print
+        i=1
+        for model in models:
+            print " %s  :  %s" %(i,model)
+            i=i+1
+        print
+        while True:
+            self.modelIndex= raw_input("Please select the Model : ")
+            if p.match(self.modelIndex) and 0<int(self.modelIndex)<i:
+                break
+        RFWIFIIC.modelName=models[int(self.modelIndex)]
+        print 'You select Model is : %s' %RFWIFIIC.modelName
         
     def ScanData(self):
         ########################################
         #to create test log and ask SN
         ########################################
         if self.debug_flag=='True':
-            a = raw_input("Please Input Enter to continue: ")
+            a = raw_input("Please Input Enter to continue [%s] : " %RFWIFIIC.modelName.replace('.ini',''))
             return
         while True:
-            self.serial_number = raw_input("Please Input Serial Number : ")
+            self.serial_number = raw_input("Please Input Serial Number [%s] : "  %RFWIFIIC.modelName.replace('.ini',''))
             p = re.compile(self.sn_re)
             if p.match(self.serial_number):
                 break
@@ -152,6 +177,7 @@ class RFWIFIIC():
         self.log.PrintNoTime('')
         self.log.PrintNoTime('#########################################################')
         self.log.PrintNoTime('Station : %s' %self.station_name)
+        self.log.PrintNoTime('Model   : ' + RFWIFIIC.modelName)
         self.log.PrintNoTime('Date    : ' + self.testDate)
         self.log.PrintNoTime('SN      : %s' %self.serial_number)
         self.log.PrintNoTime('#########################################################')
@@ -326,6 +352,7 @@ class RFWIFIIC():
             self.log.Print("********************************************************")
             self.color.print_green_text('#########################################################')
             self.color.print_green_text('Station : %s' %self.station_name)
+            self.color.print_green_text('Model   : ' + RFWIFIIC.modelName)
             self.color.print_green_text('Date    : ' + self.testDate)
             self.color.print_green_text('SN      : %s' %self.serial_number)
             self.color.print_green_text('#########################################################')
@@ -352,6 +379,7 @@ class RFWIFIIC():
             #print self.bc.BGFAIL(self.FAIL)
             self.color.print_red_text('#########################################################')
             self.color.print_red_text('Station : %s' %self.station_name)
+            self.color.print_red_text('Model   : ' + RFWIFIIC.modelName)
             self.color.print_red_text('Date    : ' + self.testDate)
             self.color.print_red_text('SN      : %s' %self.serial_number)
             self.color.print_red_text('#########################################################')
