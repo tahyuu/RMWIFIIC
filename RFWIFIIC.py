@@ -128,14 +128,16 @@ class RFWIFIIC():
     def GetModelList(self):
         if RFWIFIIC.modelName!='':
             return
+        p_ini_file=re.compile('^\S+ini$')
         p=re.compile('^\d+$')
         models = os.listdir('Model')
         print "Model List as below:" 
         print
         i=1
         for model in models:
-            print " %s  :  %s" %(i,model)
-            i=i+1
+            if p_ini_file.match(model):
+                print " %s  :  %s" %(i,model)
+                i=i+1
         print
         while True:
             self.modelIndex= raw_input("Please select the Model : ")
