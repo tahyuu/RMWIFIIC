@@ -108,9 +108,18 @@ mkdir NI
 mount -o loop NI-VISA-17.0.0.iso NI
 ./INSTALL
 ```
+* How to config the development envrioment
+```
+pip install pexpect
+unzip pyserial-2.7.zip
+cd pyserial-2.7
+python setup.py install
+pip install pyinstaller
+```
 
 * How to run create exe
   ```
-  pyinstaller -d RFWIFIIC.spec
-  ```
-  
+    pyinstaller -d RFWIFIIC.spec
+      ```
+        
+
