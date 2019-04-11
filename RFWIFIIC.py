@@ -208,21 +208,21 @@ class RFWIFIIC():
             #self.uut_comm.setTimeout(2)              
             #self.uut_comm.SendReturn('')             # Enter
             #line = self.uut_comm.RecvTerminatedBy()  # |
-            #self.uut_comm.SendReturn('2')            # 2
+            #self.uut_comm.SendReturn('2')            # 2  ---  to select Tx task options
             #line = self.uut_comm.RecvTerminatedBy()  # |
-            #self.uut_comm.SendReturn('7')            # 7
+            #self.uut_comm.SendReturn('7')            # 7  ---  set tx interval value(7) to 10
             #line = self.uut_comm.RecvTerminatedBy()  # |
             #self.uut_comm.SendReturn('10')           # 10  ---- set tx interval 10.
             #line = self.uut_comm.RecvTerminatedBy()  # |
-            #self.uut_comm.SendReturn('9')            # 9
+            #self.uut_comm.SendReturn('9')            # 9   ----   set tx fram amount(9) to 200
             #line = self.uut_comm.RecvTerminatedBy()  # |
             #self.uut_comm.SendReturn('200')          # 200 ---- set fram amount 200.
             #line = self.uut_comm.RecvTerminatedBy()  # |
-            #self.uut_comm.SendReturn('3')            # 3
+            #self.uut_comm.SendReturn('3')            # 3  ----  set tx rate(3) to xMbps
             #line = self.uut_comm.RecvTerminatedBy()  # |
-            #self.uut_comm.SendReturn('%s' %rate)     # 1  ---- set rx rate to 1Mbps.  (1:1Mbps, 6:6Mbps, 13:54Mbps)
+            #self.uut_comm.SendReturn('%s' %rate)     # 1  ---- set tx rate to 1Mbps.  (1:1Mbps, 6:6Mbps, 13:54Mbps)
             #line = self.uut_comm.RecvTerminatedBy()  # |
-            #self.uut_comm.SendReturn('4')            # 4  
+            #self.uut_comm.SendReturn('4')            # 4   ---   set tx power (4) to 6
             #line = self.uut_comm.RecvTerminatedBy()  # |
             #self.uut_comm.SendReturn('6')            # 6  ---- set tx power to  6
             #line = self.uut_comm.RecvTerminatedBy()  # |
