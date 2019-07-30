@@ -11,7 +11,14 @@ import pexpect
 import commands
 import random
 import shutil
-from Color import *
+if 'linux' in sys.platform:
+    my_os = 'linux'
+    pass
+    #from  pexpect import *
+elif 'win32' in sys.platform:
+    my_os = 'win32'
+    from Color import *
+    #from  winpexpect import *
 from Configure import *
 from Comm232 import *
 import re
@@ -40,10 +47,13 @@ class bcolors:
         self.WARNING = ''
         self.FAIL = ''
         self.ENDC = ''
-    def BGPASS(self,s):
-        return "%s%s%s" %(self.OKGREEN,s,self.ENDC)
-    def BGFAIL(self,s):
-        return "%s%s%s" %(self.FAIL,s,self.ENDC)
+    def print_blue_text(self,s):
+        print "%s%s%s" %(self.OKBLUE,s,self.ENDC)
+    def print_green_text(self,s):
+        print "%s%s%s" %(self.OKGREEN,s,self.ENDC)
+    def print_red_text(self,s):
+        #return "%s%s%s" %(self.FAIL,s,self.ENDC)
+        print "%s%s%s" %(self.FAIL,s,self.ENDC)
 
 class RFWIFIIC():
     modelName=''
@@ -53,14 +63,18 @@ class RFWIFIIC():
         self.testItemResultList=[]
         self.cf = ConfigParser.ConfigParser()
         print RFWIFIIC.modelName
-        self.cf.read('Model\\'+RFWIFIIC.modelName)
-        self.bc=bcolors()
-        self.color=Color()
+        self.cf.read('Model/'+RFWIFIIC.modelName)
+        #print 'Model\\'+RFWIFIIC.modelName
+        if my_os=='win32':
+            self.color=Color()
+        else:
+            self.color=bcolors()
         #self.log_path = os.getcwd()
         self.testIndex=index
         #station config
         self.sn_re=self.cf.get("Station_Config", "sn_re")
         self.log_path =self.cf.get("Station_Config", "log_path")
+        #print self.log_path
         self.station_name =self.cf.get("Station_Config", "station_name")
         self.fail_break=self.cf.get("Station_Config", "fail_break")
         #serial config
@@ -176,7 +190,7 @@ class RFWIFIIC():
             os.makedirs(self.log_path+'/PASS/')
         isExists = os.path.exists(self.log_path+'/FAIL/')
         if not isExists: 
-            os.makedirs(self.log_path+'/FAIl/')
+            os.makedirs(self.log_path+'/FAIL/')
 
         self.log.Open(self.log_path + '//TMP//' + self.log_filename)
         self.log.PrintNoTime('')
